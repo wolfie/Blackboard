@@ -28,10 +28,12 @@ public class BlackboardTest {
   
   private class TooManyMethodsListener implements Listener {
     @ListenerMethod
+    @SuppressWarnings("unused")
     public void first(final TestEvent event) {
     }
     
     @ListenerMethod
+    @SuppressWarnings("unused")
     public void second(final TestEvent event) {
     }
   }
@@ -44,6 +46,7 @@ public class BlackboardTest {
   
   private class SecondTestListener implements Listener {
     @ListenerMethod
+    @SuppressWarnings("unused")
     public void listenerMethod(final TestEvent event) {
     }
   }
