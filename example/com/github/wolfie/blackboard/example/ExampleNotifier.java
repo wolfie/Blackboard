@@ -1,6 +1,6 @@
-package com.github.wolfie.bbevents.example;
+package com.github.wolfie.blackboard.example;
 
-import com.github.wolfie.bbevents.Notifier;
+import com.github.wolfie.blackboard.Notifier;
 
 public class ExampleNotifier implements Notifier {
   public ExampleNotifier(final String message) {

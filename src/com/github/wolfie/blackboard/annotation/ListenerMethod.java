@@ -1,9 +1,12 @@
-package com.github.wolfie.bbevents;
+package com.github.wolfie.blackboard.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+
+import com.github.wolfie.blackboard.Event;
+import com.github.wolfie.blackboard.Listener;
 
 /**
  * <p>

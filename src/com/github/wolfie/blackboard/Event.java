@@ -1,4 +1,4 @@
-package com.github.wolfie.bbevents;
+package com.github.wolfie.blackboard;
 
 public abstract class Event {
   Notifier notifier;

@@ -1,7 +1,7 @@
-package com.github.wolfie.bbevents.exception;
+package com.github.wolfie.blackboard.exception;
 
-import com.github.wolfie.bbevents.Listener;
-import com.github.wolfie.bbevents.ListenerMethod;
+import com.github.wolfie.blackboard.Listener;
+import com.github.wolfie.blackboard.annotation.ListenerMethod;
 
 public class NoListenerMethodFoundException extends RuntimeException {
   private static final long serialVersionUID = 2145403658103285993L;

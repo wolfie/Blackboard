@@ -1,8 +1,8 @@
-package com.github.wolfie.bbevents.exception;
+package com.github.wolfie.blackboard.exception;
 
 import java.lang.reflect.Method;
 
-import com.github.wolfie.bbevents.Listener;
+import com.github.wolfie.blackboard.Listener;
 
 public class DuplicateListenerMethodException extends RuntimeException {
   private static final long serialVersionUID = 2699631613035288301L;

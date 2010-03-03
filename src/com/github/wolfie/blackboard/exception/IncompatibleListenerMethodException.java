@@ -1,9 +1,9 @@
-package com.github.wolfie.bbevents.exception;
+package com.github.wolfie.blackboard.exception;
 
 import java.lang.reflect.Method;
 
-import com.github.wolfie.bbevents.Event;
-import com.github.wolfie.bbevents.Listener;
+import com.github.wolfie.blackboard.Event;
+import com.github.wolfie.blackboard.Listener;
 
 public class IncompatibleListenerMethodException extends RuntimeException {
   private static final long serialVersionUID = 4404069292505802332L;

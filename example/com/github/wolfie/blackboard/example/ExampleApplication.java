@@ -1,6 +1,6 @@
-package com.github.wolfie.bbevents.example;
+package com.github.wolfie.blackboard.example;
 
-import com.github.wolfie.bbevents.Blackboard;
+import com.github.wolfie.blackboard.Blackboard;
 
 public class ExampleApplication {
 
