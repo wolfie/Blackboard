@@ -121,4 +121,10 @@ public class BlackboardTest {
   public void testIncompatibleMethodCountRegistration() {
     blackboard.register(IncompatibleMethodCountListener.class, TestEvent.class);
   }
+  
+  @Test
+  public void testAddListenerWithoutRegistration() {
+    // this method should not throw any exceptions.
+    blackboard.addListener(new TestListener());
+  }
 }
