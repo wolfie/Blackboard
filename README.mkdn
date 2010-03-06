@@ -1,0 +1,29 @@
+# Blackboard
+
+Blackboard is a simplistic generic event system.
+
+A Notifier can fire an Event that will be heard by a Listener (or many), wherever it may be. This is very convenient in GUI-applications, where you don't want to, or even are unable to, directly connect a notifier with a listener.
+
+## Caveats
+
+There is no singleton mechanism built into Blackboard – that has been left up to the implementor.  Instead of using a simple static final field, use a proper [ThreadLocal][tldoc] implementation. This is especially important for Java EE projects. You can find an example of its usage in this project's `example` source path.
+
+[tldoc]: http://java.sun.com/j2se/1.5.0/docs/api/java/lang/ThreadLocal.html
+
+## Dependencies
+
+* [Google Collections][googcol] is currently required for the weak-keyed Map used in Blackboard.
+* JDK 1.5
+
+[googcol]: http://code.google.com/p/google-collections/
+
+## Changelog
+
+**1.1.0**  
+Fixed memory a leak. This leads to a dependency for Google Collections.
+
+**1.0.1**  
+Fixed a bug where implementations of client Listener interfaces were not triggered.
+
+**1.0.0**  
+First version
