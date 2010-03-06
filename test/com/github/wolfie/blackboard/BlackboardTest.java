@@ -8,6 +8,7 @@ import com.github.wolfie.blackboard.exception.DuplicateListenerMethodException;
 import com.github.wolfie.blackboard.exception.DuplicateRegistrationException;
 import com.github.wolfie.blackboard.exception.IncompatibleListenerMethodException;
 import com.github.wolfie.blackboard.exception.NoListenerMethodFoundException;
+import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundException;
 
 public class BlackboardTest {
   
@@ -122,9 +123,8 @@ public class BlackboardTest {
     blackboard.register(IncompatibleMethodCountListener.class, TestEvent.class);
   }
   
-  @Test
+  @Test(expected = NoMatchingRegistrationFoundException.class)
   public void testAddListenerWithoutRegistration() {
-    // this method should not throw any exceptions.
     blackboard.addListener(new TestListener());
   }
 }

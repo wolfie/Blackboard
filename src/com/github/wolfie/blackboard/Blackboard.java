@@ -13,6 +13,8 @@ import com.github.wolfie.blackboard.exception.DuplicateRegistrationException;
 import com.github.wolfie.blackboard.exception.EventNotRegisteredException;
 import com.github.wolfie.blackboard.exception.IncompatibleListenerMethodException;
 import com.github.wolfie.blackboard.exception.NoListenerMethodFoundException;
+import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundException;
+import com.google.common.collect.MapMaker;
 
 /**
  * <p>
@@ -50,20 +52,20 @@ import com.github.wolfie.blackboard.exception.NoListenerMethodFoundException;
  * @author Henrik Paul
  */
 public class Blackboard {
-
+  
   private class Registration {
     private final Class<? extends Listener> listener;
     private final Class<? extends Event> event;
     private final Method method;
-
+    
     public Registration(final Class<? extends Listener> listener,
         final Class<? extends Event> event) {
-
+      
       Method listenerMethod = null;
       for (final Method candidateMethod : listener.getMethods()) {
         final ListenerMethod annotation = candidateMethod
             .getAnnotation(ListenerMethod.class);
-
+        
         if (annotation != null) {
           if (listenerMethod == null) {
             listenerMethod = candidateMethod;
@@ -73,7 +75,7 @@ public class Blackboard {
           }
         }
       }
-
+      
       if (listenerMethod != null) {
         final Class<?>[] parameterTypes = listenerMethod.getParameterTypes();
         if (parameterTypes.length != 1 || !parameterTypes[0].equals(event)) {
@@ -83,31 +85,32 @@ public class Blackboard {
       } else {
         throw new NoListenerMethodFoundException(listener);
       }
-
+      
       method = listenerMethod;
       this.listener = listener;
       this.event = event;
     }
-
+    
     public Class<? extends Listener> getListener() {
       return listener;
     }
-
+    
     public Class<? extends Event> getEvent() {
       return event;
     }
-
+    
     public Method getMethod() {
       return method;
     }
   }
-
+  
   private final Map<Class<? extends Event>, Registration> registrationsByEvent = new HashMap<Class<? extends Event>, Registration>();
-  private final Map<Class<? extends Listener>, Set<Listener>> listeners = new HashMap<Class<? extends Listener>, Set<Listener>>();
-
+  private final Map<Class<? extends Listener>, Set<Listener>> listeners = new MapMaker()
+      .weakKeys().weakValues().makeMap();
+  
   public Blackboard() {
   }
-
+  
   /**
    * <p>
    * Register a unique listener/event combination with Blackboard.
@@ -137,11 +140,11 @@ public class Blackboard {
    */
   public void register(final Class<? extends Listener> listener,
       final Class<? extends Event> event) {
-
+    
     if (listener == null || event == null) {
       throw new NullPointerException("Arguments may not be null");
     }
-
+    
     for (final Registration registration : registrationsByEvent.values()) {
       if (registration.getListener().equals(listener)
           || registration.getEvent().equals(event)) {
@@ -151,7 +154,7 @@ public class Blackboard {
     }
     registrationsByEvent.put(event, new Registration(listener, event));
   }
-
+  
   /**
    * <p>
    * Register a {@link Listener} with Blackboard.
@@ -168,31 +171,35 @@ public class Blackboard {
   public void addListener(final Listener listener) {
     final Class<? extends Listener> listenerClass = getRegisteredListenerClass(listener
         .getClass());
-
+    
+    if (listenerClass == null) {
+      throw new NoMatchingRegistrationFoundException(listener.getClass());
+    }
+    
     Set<Listener> listenersForClass = listeners.get(listenerClass);
     if (listenersForClass == null) {
       listenersForClass = new HashSet<Listener>();
       listeners.put(listenerClass, listenersForClass);
     }
-
+    
     listenersForClass.add(listener);
   }
-
+  
   private Class<? extends Listener> getRegisteredListenerClass(
       final Class<? extends Listener> listenerClass) {
-
+    
     for (final Registration registration : registrationsByEvent.values()) {
       final Class<? extends Listener> registeredListenerClass = registration
           .getListener();
-
+      
       if (registeredListenerClass.isAssignableFrom(listenerClass)) {
         return registeredListenerClass;
       }
     }
-
+    
     return null;
   }
-
+  
   /**
    * Remove a {@link Listener} from Blackboard.
    * 
@@ -208,7 +215,7 @@ public class Blackboard {
       return false;
     }
   }
-
+  
   /**
    * <p>
    * Fire an {@link Event}
@@ -236,14 +243,14 @@ public class Blackboard {
       final Class<? extends Listener> listenerClass = registration
           .getListener();
       final Method listenerMethod = registration.getMethod();
-
+      
       final Set<Listener> listenersForClass = listeners.get(listenerClass);
       if (listenersForClass != null) {
         for (final Listener listener : listenersForClass) {
           try {
             // inject the notifier into the event.
             event.notifier = notifier;
-
+            
             listenerMethod.invoke(listener, event);
           } catch (final IllegalArgumentException e) {
             e.printStackTrace();
