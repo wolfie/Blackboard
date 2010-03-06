@@ -10,11 +10,9 @@ public class ExampleListener implements Listener {
   public void listenerMethod(final ExampleEvent event) {
     final Notifier notifier = event.getNotifier();
     System.out.println(String.format(
-        "%s@%s noticed that %s@%s sent the following message: %s", //
-        getClass().getSimpleName(), //
-        Integer.toHexString(hashCode()), //
-        notifier.getClass().getSimpleName(), //
-        Integer.toHexString(notifier.hashCode()), //
+        "%s noticed that %s sent the following message: %s", //
+        toString(), //
+        notifier.toString(), //
         event.getMessage()) //
         );
   }
