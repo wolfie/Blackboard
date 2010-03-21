@@ -53,7 +53,7 @@ import com.google.common.collect.MapMaker;
  */
 public class Blackboard {
   
-  private class Registration {
+  private static class Registration {
     private final Class<? extends Listener> listener;
     private final Class<? extends Event> event;
     private final Method method;
