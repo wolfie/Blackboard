@@ -19,6 +19,9 @@ There is no singleton mechanism built into Blackboard – that has been left up 
 
 ## Changelog
 
+**1.1.1**  
+A class now can implement many Listeners
+
 **1.1.0**  
 Fixed memory a leak. This leads to a dependency for Google Collections.
 
