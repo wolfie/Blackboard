@@ -19,14 +19,21 @@ public class ExampleApplication {
      */
     APPLICATION.set(new ExampleApplication());
     
+    // Informs Blackboard that ExampleEvents should be sent to all
+    // ExampleListeners
     blackboard().register(ExampleListener.class, ExampleEvent.class);
     
+    // listener1 and listener2 are interested in receiving any and all events it
+    // has been registered to
     final ExampleListener listener1 = new ExampleListener();
     blackboard().addListener(listener1);
     
     final ExampleListener listener2 = new ExampleListener();
     blackboard().addListener(listener2);
     
+    // The these strings will be passed to the previous ExampleListeners without
+    // any direct connection. When the application is run, these strings will
+    // appear twice in the console, since there are two listeners
     new ExampleNotifier("Hello listeners");
     new ExampleNotifier("How are you doing?");
   }
