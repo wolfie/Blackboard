@@ -3,7 +3,6 @@ package com.github.wolfie.blackboard;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -16,6 +15,7 @@ import com.github.wolfie.blackboard.exception.IncompatibleListenerMethodExceptio
 import com.github.wolfie.blackboard.exception.NoListenerMethodFoundException;
 import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundException;
 import com.google.common.collect.MapMaker;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -34,7 +34,7 @@ import com.google.common.collect.Sets;
  * To avoid cross-application message leaking, the {@link Blackboard} is an
  * instance, not a static util class. This means, the client code must handle
  * making the instance available to the application globally, if that is
- * desired. The naïve way would be to create it as a static instance in the
+ * desired. The n&iuml;ve way would be to create it as a static instance in the
  * application, but that is not thread safe (which, in some cases, might be
  * okay).
  * </p>
@@ -106,9 +106,10 @@ public class Blackboard {
     }
   }
 
-  private final Map<Class<? extends Event>, Registration> registrationsByEvent = new HashMap<Class<? extends Event>, Registration>();
+  private final Map<Class<? extends Event>, Registration> registrationsByEvent = Maps
+      .newHashMap();
   private final Map<Class<? extends Listener>, Set<Listener>> listeners = new MapMaker()
-      .weakKeys().weakValues().makeMap();
+      .weakKeys().softValues().makeMap();
 
   public Blackboard() {
   }
