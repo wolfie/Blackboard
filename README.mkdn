@@ -19,6 +19,9 @@ There is no singleton mechanism built into Blackboard – that has been left up 
 
 ## Changelog
 
+**1.1.2**  
+Changed the hashmap to have soft values instead of weak ones
+
 **1.1.1**  
 A class now can implement many Listeners
 
