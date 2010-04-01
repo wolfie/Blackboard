@@ -166,6 +166,8 @@ public class Blackboard {
    * <p>
    * The <tt>Listener</tt> will receive all {@link Event Events} of a certain
    * type, according to any prior {@link #register(Class, Class) registrations}.
+   * Each <tt>Listener</tt> object needs to be added only once, even if it
+   * implements several Listener-interfaces.
    * </p>
    * 
    * @param listener
