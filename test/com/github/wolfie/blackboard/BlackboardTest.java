@@ -1,5 +1,6 @@
 package com.github.wolfie.blackboard;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Before;
@@ -14,13 +15,22 @@ import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundExcepti
 
 public class BlackboardTest {
 
-  public class IncompatibleEventListener implements Listener {
+  private class IncompatibleEventListener implements Listener {
+    @SuppressWarnings("unused")
+    @ListenerMethod
+    public void method(final Event event) {
+    }
+  }
+
+  private class InvalidMethodArgumentListener implements Listener {
+    @SuppressWarnings("unused")
     @ListenerMethod
     public void method(final String event) {
     }
   }
 
-  public class IncompatibleMethodCountListener implements Listener {
+  private class IncompatibleMethodCountListener implements Listener {
+    @SuppressWarnings("unused")
     @ListenerMethod
     public void method(final TestEvent event1, final TestEvent event2) {
     }
@@ -42,9 +52,17 @@ public class BlackboardTest {
   }
 
   private class TestListener implements Listener {
+
+    private boolean isTriggered = false;
+
     @ListenerMethod
     @SuppressWarnings("unused")
     public void listenerMethod(final TestEvent event) {
+      isTriggered = true;
+    }
+
+    public boolean isTriggered() {
+      return isTriggered;
     }
   }
 
@@ -59,6 +77,12 @@ public class BlackboardTest {
   }
 
   private class SecondTestEvent extends Event {
+  }
+
+  private class TestNotifier implements Notifier {
+    void notify(final TestEvent event) {
+      blackboard.fire(event, this);
+    }
   }
 
   private interface MultiListenerOneListener extends Listener {
@@ -113,17 +137,17 @@ public class BlackboardTest {
   }
 
   @Test(expected = NullPointerException.class)
-  public void testNullRegistrationBoth() {
+  public void testRegisteringNullListenerAndNullEvent() {
     blackboard.register(null, null);
   }
 
   @Test(expected = NullPointerException.class)
-  public void testNullRegistrationFirst() {
+  public void testRegisteringNullListener() {
     blackboard.register(null, TestEvent.class);
   }
 
   @Test(expected = NullPointerException.class)
-  public void testNullRegistrationSecond() {
+  public void testRegisteringNullEvent() {
     blackboard.register(TestListener.class, null);
   }
 
@@ -138,25 +162,30 @@ public class BlackboardTest {
   }
 
   @Test(expected = DuplicateRegistrationException.class)
-  public void testDuplicateRegistrationSame() {
+  public void testDuplicateRegistration() {
     blackboard.register(TestListener.class, TestEvent.class);
     blackboard.register(TestListener.class, TestEvent.class);
   }
 
   @Test(expected = DuplicateRegistrationException.class)
-  public void testDuplicateRegistrationFirst() {
+  public void testDuplicateRegistrationOfListener() {
     blackboard.register(TestListener.class, TestEvent.class);
     blackboard.register(TestListener.class, SecondTestEvent.class);
   }
 
   @Test(expected = DuplicateRegistrationException.class)
-  public void testDuplicateRegistrationSecond() {
+  public void testDuplicateRegistrationOfEvent() {
     blackboard.register(TestListener.class, TestEvent.class);
     blackboard.register(SecondTestListener.class, TestEvent.class);
   }
 
   @Test(expected = IncompatibleListenerMethodException.class)
-  public void testIncompatibleArgumentRegistration() {
+  public void testInvalidListenerArgumentRegistration() {
+    blackboard.register(InvalidMethodArgumentListener.class, TestEvent.class);
+  }
+
+  @Test(expected = IncompatibleListenerMethodException.class)
+  public void testIncompatibleEventRegistration() {
     blackboard.register(IncompatibleEventListener.class, TestEvent.class);
   }
 
@@ -188,5 +217,91 @@ public class BlackboardTest {
 
     assertTrue("First event wasn't caught", multiListener.is1Triggered());
     assertTrue("Second event wasn't caught", multiListener.is2Triggered());
+  }
+
+  @Test
+  public void testListenerHasNoEventToBeginWith() {
+    blackboard.register(TestListener.class, TestEvent.class);
+
+    final TestListener testListener = new TestListener();
+    assertFalse(testListener.isTriggered());
+  }
+
+  @Test
+  public void testListenerDoesntHearWithoutAdding() {
+    blackboard.register(TestListener.class, TestEvent.class);
+
+    final TestListener listener = new TestListener();
+
+    new TestNotifier().notify(new TestEvent());
+
+    assertFalse(listener.isTriggered());
+  }
+
+  @Test
+  public void testListenerHearsWithAdding() {
+    blackboard.register(TestListener.class, TestEvent.class);
+
+    final TestListener listener = new TestListener();
+    blackboard.addListener(listener);
+
+    new TestNotifier().notify(new TestEvent());
+
+    assertTrue(listener.isTriggered());
+  }
+
+  @Test
+  public void testRemoveListenerImplementingOneInterface() {
+    blackboard.register(TestListener.class, TestEvent.class);
+
+    final TestListener listener = new TestListener();
+    blackboard.addListener(listener);
+    assertTrue("Removing listener failed", blackboard.removeListener(listener));
+
+    new TestNotifier().notify(new TestEvent());
+
+    assertFalse("Event was triggered, when it shouldn't", listener
+        .isTriggered());
+  }
+
+  @Test
+  public void testRemoveListenerImplementingTwoInterfaces() {
+    blackboard.register(MultiListenerOneListener.class,
+        MultiListenerOneEvent.class);
+    blackboard.register(MultiListenerTwoListener.class,
+        MultiListenerTwoEvent.class);
+
+    final MultiListener listener = new MultiListener();
+    blackboard.addListener(listener);
+    assertTrue("Removing listener failed", blackboard.removeListener(listener));
+
+    final Notifier notifier = new Notifier() {
+    };
+
+    blackboard.fire(new MultiListenerOneEvent(), notifier);
+    blackboard.fire(new MultiListenerTwoEvent(), notifier);
+
+    assertFalse("First event was triggered, when it shouldn't", listener
+        .is1Triggered());
+    assertFalse("Second event was triggered, when it shouldn't", listener
+        .is2Triggered());
+  }
+
+  @Test(expected = NullPointerException.class)
+  public void testFiringNullEventWithNullNotifier() {
+    blackboard.register(TestListener.class, TestEvent.class);
+    blackboard.fire(null, null);
+  }
+
+  @Test(expected = NullPointerException.class)
+  public void testFiringNullEvent() {
+    blackboard.register(TestListener.class, TestEvent.class);
+    blackboard.fire(null, new TestNotifier());
+  }
+
+  @Test(expected = NullPointerException.class)
+  public void testFiringWithNullNotifier() {
+    blackboard.register(TestListener.class, TestEvent.class);
+    blackboard.fire(new TestEvent(), null);
   }
 }

@@ -174,25 +174,28 @@ public class Blackboard {
    *          The Listener to register.
    */
   public void addListener(final Listener listener) {
-    final Collection<Class<? extends Listener>> listenerClasses = getRegisteredListenerClass(listener
-        .getClass());
 
-    if (listenerClasses.isEmpty()) {
-      throw new NoMatchingRegistrationFoundException(listener.getClass());
+    assertNotNull(listener);
+
+    final Class<? extends Listener> listenerClass = listener.getClass();
+    final Collection<Class<? extends Listener>> registeredListenerClasses = getRegisteredListenerClasses(listenerClass);
+
+    if (registeredListenerClasses.isEmpty()) {
+      throw new NoMatchingRegistrationFoundException(listenerClass);
     }
 
-    for (final Class<? extends Listener> listenerClass : listenerClasses) {
-      Set<Listener> listenersForClass = listeners.get(listenerClass);
+    for (final Class<? extends Listener> registeredListenerClass : registeredListenerClasses) {
+      Set<Listener> listenersForClass = listeners.get(registeredListenerClass);
       if (listenersForClass == null) {
         listenersForClass = new HashSet<Listener>();
-        listeners.put(listenerClass, listenersForClass);
+        listeners.put(registeredListenerClass, listenersForClass);
       }
 
       listenersForClass.add(listener);
     }
   }
 
-  private Collection<Class<? extends Listener>> getRegisteredListenerClass(
+  private Collection<Class<? extends Listener>> getRegisteredListenerClasses(
       final Class<? extends Listener> listenerClass) {
 
     final Collection<Class<? extends Listener>> listeners = Sets.newHashSet();
@@ -217,12 +220,24 @@ public class Blackboard {
    * @return <code>true</code> iff <tt>listener</tt> was found and removed.
    */
   public boolean removeListener(final Listener listener) {
-    final Set<Listener> listenersOfClass = listeners.get(listener.getClass());
-    if (listenersOfClass != null) {
-      return listenersOfClass.remove(listener);
-    } else {
-      return false;
+    final Class<? extends Listener> listenerClass = listener.getClass();
+    final Collection<Class<? extends Listener>> registeredListenerClasses = getRegisteredListenerClasses(listenerClass);
+
+    boolean success = false;
+
+    for (final Class<? extends Listener> registeredListenerClass : registeredListenerClasses) {
+      final Set<Listener> listenersOfClass = listeners
+          .get(registeredListenerClass);
+      if (listenersOfClass != null) {
+        final boolean intermediateSuccess = listenersOfClass.remove(listener);
+
+        if (!success) {
+          success = intermediateSuccess;
+        }
+      }
     }
+
+    return success;
   }
 
   /**
@@ -246,6 +261,9 @@ public class Blackboard {
    *           {@link #register(Class, Class) registered} with Blackboard.
    */
   public void fire(final Event event, final Notifier notifier) {
+
+    assertNotNull(event, notifier);
+
     final Registration registration = registrationsByEvent
         .get(event.getClass());
     if (registration != null) {
@@ -274,6 +292,23 @@ public class Blackboard {
 
     else {
       throw new EventNotRegisteredException(event.getClass());
+    }
+  }
+
+  /**
+   * Assert that no arguments are <code>null</code>
+   * 
+   * @param args
+   *          the arguments to check.
+   * @throws NullPointerException
+   *           if any of <tt>args</tt> is <code>null</code>.
+   */
+  private void assertNotNull(final Object... args) {
+    for (int i = 0; i < args.length; i++) {
+      if (args[i] == null) {
+        throw new NullPointerException("Argument with index " + i
+            + " was null.");
+      }
     }
   }
 }
