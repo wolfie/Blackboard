@@ -25,4 +25,9 @@ public class ExampleEvent extends Event {
   public String getMessage() {
     return message;
   }
+  
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
+  }
 }

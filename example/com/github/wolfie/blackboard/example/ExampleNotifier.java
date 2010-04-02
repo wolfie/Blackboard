@@ -20,4 +20,9 @@ public class ExampleNotifier implements Notifier {
   public ExampleNotifier(final String message) {
     ExampleApplication.blackboard().fire(new ExampleEvent(message), this);
   }
+  
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
+  }
 }

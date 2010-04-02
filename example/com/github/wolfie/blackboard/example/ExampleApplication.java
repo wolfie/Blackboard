@@ -11,6 +11,7 @@ public class ExampleApplication {
   private static ThreadLocal<ExampleApplication> APPLICATION = new ThreadLocal<ExampleApplication>();
   
   public static void main(final String[] args) {
+    
     /*
      * The ThreadLocal needs to be set each time you might change Thread. In
      * Java EE applications, you probably need to let your application implement
@@ -18,6 +19,8 @@ public class ExampleApplication {
      * instance
      */
     APPLICATION.set(new ExampleApplication());
+    
+    blackboard().enableLogging();
     
     // Informs Blackboard that ExampleEvents should be sent to all
     // ExampleListeners

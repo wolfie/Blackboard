@@ -33,10 +33,15 @@ public class ExampleListener implements Listener {
   public void listenerMethod(final ExampleEvent event) {
     final Notifier notifier = event.getNotifier();
     System.out.println(String.format(
-        "%s noticed that %s sent the following message: %s", //
+        "[App] %s noticed that %s sent the following message: %s", //
         toString(), //
         notifier.toString(), //
         event.getMessage()) //
         );
+  }
+  
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + "@" + Integer.toHexString(hashCode());
   }
 }
