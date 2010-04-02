@@ -54,20 +54,20 @@ import com.google.common.collect.Sets;
  * @author Henrik Paul
  */
 public class Blackboard {
-
+  
   private static class Registration {
     private final Class<? extends Listener> listener;
     private final Class<? extends Event> event;
     private final Method method;
-
+    
     public Registration(final Class<? extends Listener> listener,
         final Class<? extends Event> event) {
-
+      
       Method listenerMethod = null;
       for (final Method candidateMethod : listener.getMethods()) {
         final ListenerMethod annotation = candidateMethod
             .getAnnotation(ListenerMethod.class);
-
+        
         if (annotation != null) {
           if (listenerMethod == null) {
             listenerMethod = candidateMethod;
@@ -77,7 +77,7 @@ public class Blackboard {
           }
         }
       }
-
+      
       if (listenerMethod != null) {
         final Class<?>[] parameterTypes = listenerMethod.getParameterTypes();
         if (parameterTypes.length != 1 || !parameterTypes[0].equals(event)) {
@@ -87,33 +87,33 @@ public class Blackboard {
       } else {
         throw new NoListenerMethodFoundException(listener);
       }
-
+      
       method = listenerMethod;
       this.listener = listener;
       this.event = event;
     }
-
+    
     public Class<? extends Listener> getListener() {
       return listener;
     }
-
+    
     public Class<? extends Event> getEvent() {
       return event;
     }
-
+    
     public Method getMethod() {
       return method;
     }
   }
-
+  
   private final Map<Class<? extends Event>, Registration> registrationsByEvent = Maps
       .newHashMap();
   private final Map<Class<? extends Listener>, Set<Listener>> listeners = new MapMaker()
       .weakKeys().softValues().makeMap();
-
+  
   public Blackboard() {
   }
-
+  
   /**
    * <p>
    * Register a unique listener/event combination with Blackboard.
@@ -143,11 +143,11 @@ public class Blackboard {
    */
   public void register(final Class<? extends Listener> listener,
       final Class<? extends Event> event) {
-
-    if (listener == null || event == null) {
-      throw new NullPointerException("Arguments may not be null");
-    }
-
+    
+    assertNotNull(listener, event);
+    
+    Log.log("Registering " + listener + " to " + event);
+    
     for (final Registration registration : registrationsByEvent.values()) {
       if (registration.getListener().equals(listener)
           || registration.getEvent().equals(event)) {
@@ -156,8 +156,10 @@ public class Blackboard {
       }
     }
     registrationsByEvent.put(event, new Registration(listener, event));
+    
+    Log.logEmptyLine();
   }
-
+  
   /**
    * <p>
    * Register a {@link Listener} with Blackboard.
@@ -174,44 +176,49 @@ public class Blackboard {
    *          The Listener to register.
    */
   public void addListener(final Listener listener) {
-
+    
+    Log.log("Adding " + listener + " for following listeners:");
+    
     assertNotNull(listener);
-
+    
     final Class<? extends Listener> listenerClass = listener.getClass();
     final Collection<Class<? extends Listener>> registeredListenerClasses = getRegisteredListenerClasses(listenerClass);
-
+    
     if (registeredListenerClasses.isEmpty()) {
       throw new NoMatchingRegistrationFoundException(listenerClass);
     }
-
+    
     for (final Class<? extends Listener> registeredListenerClass : registeredListenerClasses) {
       Set<Listener> listenersForClass = listeners.get(registeredListenerClass);
       if (listenersForClass == null) {
         listenersForClass = new HashSet<Listener>();
         listeners.put(registeredListenerClass, listenersForClass);
       }
-
+      
       listenersForClass.add(listener);
+      Log.log("  ...listening to " + registeredListenerClass);
     }
+    
+    Log.logEmptyLine();
   }
-
+  
   private Collection<Class<? extends Listener>> getRegisteredListenerClasses(
       final Class<? extends Listener> listenerClass) {
-
+    
     final Collection<Class<? extends Listener>> listeners = Sets.newHashSet();
-
+    
     for (final Registration registration : registrationsByEvent.values()) {
       final Class<? extends Listener> registeredListenerClass = registration
           .getListener();
-
+      
       if (registeredListenerClass.isAssignableFrom(listenerClass)) {
         listeners.add(registeredListenerClass);
       }
     }
-
+    
     return listeners;
   }
-
+  
   /**
    * Remove a {@link Listener} from Blackboard.
    * 
@@ -220,26 +227,35 @@ public class Blackboard {
    * @return <code>true</code> iff <tt>listener</tt> was found and removed.
    */
   public boolean removeListener(final Listener listener) {
+    
+    assertNotNull(listener);
+    
+    Log.log("Removing " + listener);
+    
     final Class<? extends Listener> listenerClass = listener.getClass();
     final Collection<Class<? extends Listener>> registeredListenerClasses = getRegisteredListenerClasses(listenerClass);
-
+    
     boolean success = false;
-
+    
     for (final Class<? extends Listener> registeredListenerClass : registeredListenerClasses) {
       final Set<Listener> listenersOfClass = listeners
           .get(registeredListenerClass);
       if (listenersOfClass != null) {
         final boolean intermediateSuccess = listenersOfClass.remove(listener);
-
+        
+        Log.log("  ...removing it from " + registeredListenerClass);
+        
         if (!success) {
           success = intermediateSuccess;
         }
       }
     }
-
+    
+    Log.logEmptyLine();
+    
     return success;
   }
-
+  
   /**
    * <p>
    * Fire an {@link Event}
@@ -261,40 +277,45 @@ public class Blackboard {
    *           {@link #register(Class, Class) registered} with Blackboard.
    */
   public void fire(final Event event, final Notifier notifier) {
-
+    
     assertNotNull(event, notifier);
-
+    
+    Log.log("Firing " + event + " from " + notifier);
+    
     final Registration registration = registrationsByEvent
         .get(event.getClass());
-    if (registration != null) {
-      final Class<? extends Listener> listenerClass = registration
-          .getListener();
-      final Method listenerMethod = registration.getMethod();
-
-      final Set<Listener> listenersForClass = listeners.get(listenerClass);
-      if (listenersForClass != null) {
-        for (final Listener listener : listenersForClass) {
-          try {
-            // inject the notifier into the event.
-            event.notifier = notifier;
-
-            listenerMethod.invoke(listener, event);
-          } catch (final IllegalArgumentException e) {
-            e.printStackTrace();
-          } catch (final IllegalAccessException e) {
-            e.printStackTrace();
-          } catch (final InvocationTargetException e) {
-            e.printStackTrace();
-          }
-        }
-      }
-    }
-
-    else {
+    
+    if (registration == null) {
       throw new EventNotRegisteredException(event.getClass());
     }
+    
+    final Class<? extends Listener> listenerClass = registration.getListener();
+    final Method listenerMethod = registration.getMethod();
+    
+    final Set<Listener> listenersForClass = listeners.get(listenerClass);
+    if (listenersForClass == null) {
+      return;
+    }
+    
+    for (final Listener listener : listenersForClass) {
+      try {
+        // inject the notifier into the event.
+        event.notifier = notifier;
+        
+        Log.log("  triggering " + listener);
+        listenerMethod.invoke(listener, event);
+      } catch (final IllegalArgumentException e) {
+        e.printStackTrace();
+      } catch (final IllegalAccessException e) {
+        e.printStackTrace();
+      } catch (final InvocationTargetException e) {
+        e.printStackTrace();
+      }
+    }
+    
+    Log.logEmptyLine();
   }
-
+  
   /**
    * Assert that no arguments are <code>null</code>
    * 
@@ -310,5 +331,13 @@ public class Blackboard {
             + " was null.");
       }
     }
+  }
+  
+  public void enableLogging() {
+    Log.setLogging(true);
+  }
+  
+  public void disableLogging() {
+    Log.setLogging(false);
   }
 }
