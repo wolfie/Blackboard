@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <project name="Blackboard" default="jar" basedir=".">
-	<property name="build.dir" value="build" />
+	<property name="build.dir" value="result" />
 	<property name="source.dir" value="src" />
 	<property name="work.dir" value="${build.dir}/work"/>
 	<property name="classes.dir" value="${work.dir}/classes"/>
@@ -11,6 +11,8 @@
 	<property name="manifest.mf" value="META-INF/MANIFEST.MF"/>
 	
 	<property name="ant.build.javac.target" value="1.5"/>
+	
+	<loadproperties srcfile="${manifest.mf}" />
 	
 	<target name="clear">
 		<delete dir="${build.dir}" includeemptydirs="yes"/>
@@ -38,7 +40,7 @@
 		<jar
 			manifest="${manifest.mf}"
 			basedir="${work.dir}/jar"
-			destfile="${artifacts.dir}/blackboard.jar"
+			destfile="${artifacts.dir}/blackboard-${Implementation-Version}.jar"
 		/>
 	</target>
 </project>
