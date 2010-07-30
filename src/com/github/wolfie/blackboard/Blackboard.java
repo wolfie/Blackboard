@@ -2,6 +2,7 @@ package com.github.wolfie.blackboard;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -65,9 +66,10 @@ public class Blackboard {
       if (!listener.isInterface()) {
         throw new IllegalArgumentException(
             "Unexpected non-interface argument: " + listener);
-      } else if (event.isInterface()) {
-        throw new IllegalArgumentException("Unexpected interface argument: "
-            + event);
+      } else if (event.isInterface()
+          || Modifier.isAbstract(event.getModifiers())) {
+        throw new IllegalArgumentException(
+            "Unexpected interface or abstract class argument: " + event);
       }
 
       Method listenerMethod = null;
@@ -152,7 +154,7 @@ public class Blackboard {
    *           exactly one argument, it being of type <tt>event</tt>.
    * @throws IllegalArgumentException
    *           if <tt>listener</tt> is a non-interface class, and/or
-   *           <tt>event</tt> is a interface class object.
+   *           <tt>event</tt> is a interface or an abstract class object.
    */
   public void register(final Class<? extends Listener> listener,
       final Class<? extends Event> event) {
