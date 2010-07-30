@@ -15,6 +15,14 @@ import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundExcepti
 
 public class BlackboardTest {
 
+  private abstract class AbstractTestEvent implements Event {
+  }
+
+  private interface ListenerForAbstractEvent extends Listener {
+    @ListenerMethod
+    void method(AbstractTestEvent event);
+  }
+
   private interface IncompatibleEventListener extends Listener {
     @ListenerMethod
     void method(final Event event);
@@ -288,5 +296,11 @@ public class BlackboardTest {
   public void testFiringNullEvent() {
     blackboard.register(TestListener.class, TestEvent.class);
     blackboard.fire(null);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testRegisteringAbstractEvent() {
+    blackboard
+        .register(ListenerForAbstractEvent.class, AbstractTestEvent.class);
   }
 }
