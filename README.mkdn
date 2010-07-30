@@ -12,8 +12,8 @@ There is no singleton mechanism built into Blackboard - that has been left up to
 
 ## Dependencies
 
-* [Google Collections][googcol] is currently required for the weak-keyed Map used in Blackboard.
 * JDK 1.5
+* [Google Collections][googcol] is required for versions 1.1.0-1.2.0 
 
 [googcol]: http://code.google.com/p/google-collections/
 
