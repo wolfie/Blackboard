@@ -3,9 +3,11 @@ package com.github.wolfie.blackboard;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.wolfie.blackboard.annotation.ListenerMethod;
 import com.github.wolfie.blackboard.exception.DuplicateListenerMethodException;
@@ -14,9 +16,6 @@ import com.github.wolfie.blackboard.exception.EventNotRegisteredException;
 import com.github.wolfie.blackboard.exception.IncompatibleListenerMethodException;
 import com.github.wolfie.blackboard.exception.NoListenerMethodFoundException;
 import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundException;
-import com.google.common.collect.MapMaker;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 /**
  * <p>
@@ -26,8 +25,7 @@ import com.google.common.collect.Sets;
  * <p>
  * Blackboard is a <a href="http://en.wikipedia.org/wiki/Blackboard_system">
  * blackboard system</a>-based event handler. {@link Listener Listeners} can add
- * themselves as listeners for a certain {@link Event}, that are fired by
- * {@link Notifier Notifiers}.
+ * themselves as listeners for a certain {@link Event}.
  * </p>
  * 
  * <p>
@@ -54,20 +52,29 @@ import com.google.common.collect.Sets;
  * @author Henrik Paul
  */
 public class Blackboard {
-  
+
   private static class Registration {
     private final Class<? extends Listener> listener;
     private final Class<? extends Event> event;
     private final Method method;
-    
+
     public Registration(final Class<? extends Listener> listener,
-        final Class<? extends Event> event) {
-      
+        final Class<? extends Event> event)
+        throws DuplicateListenerMethodException {
+
+      if (!listener.isInterface()) {
+        throw new IllegalArgumentException(
+            "Unexpected non-interface argument: " + listener);
+      } else if (event.isInterface()) {
+        throw new IllegalArgumentException("Unexpected interface argument: "
+            + event);
+      }
+
       Method listenerMethod = null;
       for (final Method candidateMethod : listener.getMethods()) {
         final ListenerMethod annotation = candidateMethod
             .getAnnotation(ListenerMethod.class);
-        
+
         if (annotation != null) {
           if (listenerMethod == null) {
             listenerMethod = candidateMethod;
@@ -77,7 +84,7 @@ public class Blackboard {
           }
         }
       }
-      
+
       if (listenerMethod != null) {
         final Class<?>[] parameterTypes = listenerMethod.getParameterTypes();
         if (parameterTypes.length != 1 || !parameterTypes[0].equals(event)) {
@@ -87,33 +94,36 @@ public class Blackboard {
       } else {
         throw new NoListenerMethodFoundException(listener);
       }
-      
+
+      Log.log(String.format("Registering %s.%s() to %s", listener.getName(),
+          listenerMethod.getName(), event.getName()));
+      Log.logEmptyLine();
+
       method = listenerMethod;
       this.listener = listener;
       this.event = event;
     }
-    
+
     public Class<? extends Listener> getListener() {
       return listener;
     }
-    
+
     public Class<? extends Event> getEvent() {
       return event;
     }
-    
+
     public Method getMethod() {
       return method;
     }
   }
-  
-  private final Map<Class<? extends Event>, Registration> registrationsByEvent = Maps
-      .newHashMap();
-  private final Map<Class<? extends Listener>, Set<Listener>> listeners = new MapMaker()
-      .weakKeys().softValues().makeMap();
-  
+
+  private final Map<Class<? extends Event>, Registration> registrationsByEvent = new HashMap<Class<? extends Event>, Blackboard.Registration>();
+  private final Map<Class<? extends Listener>, Set<Listener>> listeners;
+
   public Blackboard() {
+    listeners = new ConcurrentHashMap<Class<? extends Listener>, Set<Listener>>();
   }
-  
+
   /**
    * <p>
    * Register a unique listener/event combination with Blackboard.
@@ -125,9 +135,9 @@ public class Blackboard {
    * </p>
    * 
    * @param listener
-   *          The listener type to register with <tt>event</tt>.
+   *          The {@link Listener} interface to register with <tt>event</tt>.
    * @param event
-   *          The event type to register with <tt>listener</tt>.
+   *          The {@link Event} interface to register with <tt>listener</tt>.
    * @throws DuplicateRegistrationException
    *           if <tt>listener</tt> and/or <tt>event</tt> is already previously
    *           registered.
@@ -140,26 +150,28 @@ public class Blackboard {
    * @throws IncompatibleListenerMethodException
    *           if the method annotated with {@link ListenerMethod} doesn't have
    *           exactly one argument, it being of type <tt>event</tt>.
+   * @throws IllegalArgumentException
+   *           if <tt>listener</tt> is a non-interface class, and/or
+   *           <tt>event</tt> is a interface class object.
    */
   public void register(final Class<? extends Listener> listener,
       final Class<? extends Event> event) {
-    
+
     assertNotNull(listener, event);
-    
-    Log.log("Registering " + listener + " to " + event);
-    
+
     for (final Registration registration : registrationsByEvent.values()) {
-      if (registration.getListener().equals(listener)
-          || registration.getEvent().equals(event)) {
-        throw new DuplicateRegistrationException(listener, event, registration
-            .getListener(), registration.getEvent());
+      final Class<? extends Listener> existingListener = registration
+          .getListener();
+      final Class<? extends Event> existingEvent = registration.getEvent();
+
+      if (existingListener.equals(listener) || existingEvent.equals(event)) {
+        throw new DuplicateRegistrationException(listener, event,
+            existingListener, existingEvent);
       }
     }
     registrationsByEvent.put(event, new Registration(listener, event));
-    
-    Log.logEmptyLine();
   }
-  
+
   /**
    * <p>
    * Register a {@link Listener} with Blackboard.
@@ -172,53 +184,58 @@ public class Blackboard {
    * implements several Listener-interfaces.
    * </p>
    * 
+   * <p>
+   * <em>Note:</em> By design, no listener order is preserved. This means, the
+   * order in which the listeners are added is not guaranteed to be the same as
+   * in which the listeners are triggered.
+   * </p>
+   * 
    * @param listener
    *          The Listener to register.
    */
   public void addListener(final Listener listener) {
-    
-    Log.log("Adding " + listener + " for following listeners:");
-    
     assertNotNull(listener);
-    
+
+    Log.log("Adding " + listener + " for the following listeners:");
+
     final Class<? extends Listener> listenerClass = listener.getClass();
     final Collection<Class<? extends Listener>> registeredListenerClasses = getRegisteredListenerClasses(listenerClass);
-    
+
     if (registeredListenerClasses.isEmpty()) {
       throw new NoMatchingRegistrationFoundException(listenerClass);
     }
-    
+
     for (final Class<? extends Listener> registeredListenerClass : registeredListenerClasses) {
       Set<Listener> listenersForClass = listeners.get(registeredListenerClass);
       if (listenersForClass == null) {
         listenersForClass = new HashSet<Listener>();
         listeners.put(registeredListenerClass, listenersForClass);
       }
-      
+
       listenersForClass.add(listener);
       Log.log("  ...listening to " + registeredListenerClass);
     }
-    
+
     Log.logEmptyLine();
   }
-  
+
   private Collection<Class<? extends Listener>> getRegisteredListenerClasses(
       final Class<? extends Listener> listenerClass) {
-    
-    final Collection<Class<? extends Listener>> listeners = Sets.newHashSet();
-    
+
+    final Collection<Class<? extends Listener>> listeners = new HashSet<Class<? extends Listener>>();
+
     for (final Registration registration : registrationsByEvent.values()) {
       final Class<? extends Listener> registeredListenerClass = registration
           .getListener();
-      
+
       if (registeredListenerClass.isAssignableFrom(listenerClass)) {
         listeners.add(registeredListenerClass);
       }
     }
-    
+
     return listeners;
   }
-  
+
   /**
    * Remove a {@link Listener} from Blackboard.
    * 
@@ -227,35 +244,35 @@ public class Blackboard {
    * @return <code>true</code> iff <tt>listener</tt> was found and removed.
    */
   public boolean removeListener(final Listener listener) {
-    
+
     assertNotNull(listener);
-    
+
     Log.log("Removing " + listener);
-    
+
     final Class<? extends Listener> listenerClass = listener.getClass();
     final Collection<Class<? extends Listener>> registeredListenerClasses = getRegisteredListenerClasses(listenerClass);
-    
+
     boolean success = false;
-    
+
     for (final Class<? extends Listener> registeredListenerClass : registeredListenerClasses) {
       final Set<Listener> listenersOfClass = listeners
           .get(registeredListenerClass);
       if (listenersOfClass != null) {
         final boolean intermediateSuccess = listenersOfClass.remove(listener);
-        
+
         Log.log("  ...removing it from " + registeredListenerClass);
-        
+
         if (!success) {
           success = intermediateSuccess;
         }
       }
     }
-    
+
     Log.logEmptyLine();
-    
+
     return success;
   }
-  
+
   /**
    * <p>
    * Fire an {@link Event}
@@ -268,41 +285,36 @@ public class Blackboard {
    * 
    * @param event
    *          The Event to fire.
-   * @param notifier
-   *          The {@link Notifier} that fired the <tt>event</tt>. This will be
-   *          injected into <tt>event</tt>, and can be accessed via
-   *          {@link Event#getNotifier()}.
    * @throws EventNotRegisteredException
-   *           if <tt>event</tt>'s type wasn't previously
-   *           {@link #register(Class, Class) registered} with Blackboard.
+   *           if <tt>event</tt>'s type wasn't previously registered with
+   *           Blackboard.
+   * @see #register(Class, Class)
    */
-  public void fire(final Event event, final Notifier notifier) {
-    
-    assertNotNull(event, notifier);
-    
-    Log.log("Firing " + event + " from " + notifier);
-    
+  public void fire(final Event event) {
+
+    assertNotNull(event);
+
+    Log.log("Firing " + event);
+
     final Registration registration = registrationsByEvent
         .get(event.getClass());
-    
+
     if (registration == null) {
       throw new EventNotRegisteredException(event.getClass());
     }
-    
+
     final Class<? extends Listener> listenerClass = registration.getListener();
     final Method listenerMethod = registration.getMethod();
-    
+
     final Set<Listener> listenersForClass = listeners.get(listenerClass);
     if (listenersForClass == null) {
       return;
     }
-    
+
     for (final Listener listener : listenersForClass) {
       try {
-        // inject the notifier into the event.
-        event.notifier = notifier;
-        
         Log.log("  triggering " + listener);
+
         listenerMethod.invoke(listener, event);
       } catch (final IllegalArgumentException e) {
         e.printStackTrace();
@@ -312,10 +324,10 @@ public class Blackboard {
         e.printStackTrace();
       }
     }
-    
+
     Log.logEmptyLine();
   }
-  
+
   /**
    * Assert that no arguments are <code>null</code>
    * 
@@ -332,11 +344,11 @@ public class Blackboard {
       }
     }
   }
-  
+
   public void enableLogging() {
     Log.setLogging(true);
   }
-  
+
   public void disableLogging() {
     Log.setLogging(false);
   }

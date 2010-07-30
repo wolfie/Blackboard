@@ -1,51 +1,53 @@
 package com.github.wolfie.blackboard.example;
 
 import com.github.wolfie.blackboard.Blackboard;
+import com.github.wolfie.blackboard.example.TestMessageEvent.TestMessageListener;
 
 public class ExampleApplication {
-  
-  /**
-   * The singleton instance (for the current thread) of {@link Blackboard}.
-   */
-  private final Blackboard blackboardInstance = new Blackboard();
-  private static ThreadLocal<ExampleApplication> APPLICATION = new ThreadLocal<ExampleApplication>();
-  
+
+  private static final Blackboard BLACKBOARD = new Blackboard();
+
   public static void main(final String[] args) {
-    
+
+    BLACKBOARD.enableLogging();
+
     /*
-     * The ThreadLocal needs to be set each time you might change Thread. In
-     * Java EE applications, you probably need to let your application implement
-     * TransactionListener and in transactionStart() re-set the APPLICATION
-     * instance
+     * Informs Blackboard that all TestMessageEvents should be sent to all
+     * objects that implement TestMessageListener.
+     * 
+     * Keeping all registrations in one central place will make the code easier
+     * to read, and mitigates application bugs regarding late registration.
      */
-    APPLICATION.set(new ExampleApplication());
-    
-    blackboard().enableLogging();
-    
-    // Informs Blackboard that ExampleEvents should be sent to all
-    // ExampleListeners
-    blackboard().register(ExampleListener.class, ExampleEvent.class);
-    
-    // listener1 and listener2 are interested in receiving any and all events it
-    // has been registered to
-    final ExampleListener listener1 = new ExampleListener();
-    blackboard().addListener(listener1);
-    
-    final ExampleListener listener2 = new ExampleListener();
-    blackboard().addListener(listener2);
-    
-    // The these strings will be passed to the previous ExampleListeners without
-    // any direct connection. When the application is run, these strings will
-    // appear twice in the console, since there are two listeners
-    new ExampleNotifier("Hello listeners");
-    new ExampleNotifier("How are you doing?");
+    BLACKBOARD.register(TestMessageListener.class, TestMessageEvent.class);
+
+    /*
+     * Adds the two objects as listeners into Blackboard. Blackboard will now
+     * inform these objects whenever an event is triggered that is registered to
+     * their interface.
+     * 
+     * The MessageConsumer implements TestMessageListener, which listens to
+     * TestMessageEvents. When the event is fired, the MessageConsumer prints
+     * out the message in the event.
+     * 
+     * Note that order is not guaranteed by Blackboard. I.e. the order in which
+     * the listeners are triggered is probably not the same in which the
+     * listeners were added.
+     */
+    BLACKBOARD.addListener(new MessageConsumer(1));
+    BLACKBOARD.addListener(new MessageConsumer(2));
+
+    /*
+     * These strings will be passed to the two MessageConsumers just added to
+     * blackboard, without any apparent direct connection.
+     * 
+     * Each of these strings will appear twice in the console, since there are
+     * two listeners interested in them.
+     */
+    sendString("Hello listeners");
+    sendString("How are you doing?");
   }
-  
-  public static ExampleApplication getCurrent() {
-    return APPLICATION.get();
-  }
-  
-  public static Blackboard blackboard() {
-    return getCurrent().blackboardInstance;
+
+  private static void sendString(final String message) {
+    BLACKBOARD.fire(new TestMessageEvent(message));
   }
 }

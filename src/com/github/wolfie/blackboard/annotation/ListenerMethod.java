@@ -24,5 +24,4 @@ import com.github.wolfie.blackboard.Listener;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 public @interface ListenerMethod {
-
 }

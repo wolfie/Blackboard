@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<!-- 
+The Eclipse plug-in doesn't currently support non-web projects, 
+so an Ant script is needed to package everything into a 
+Directory -compatible .jar
+-->
+
 <project name="Blackboard" default="jar" basedir=".">
 	<property name="build.dir" value="result" />
 	<property name="source.dir" value="src" />
@@ -7,24 +13,22 @@
 	<property name="classes.dir" value="${work.dir}/classes"/>
 	<property name="artifacts.dir" value="${build.dir}/artifacts"/>
 	<property name="libs.dir" value="lib"/>
-	<property name="google-collect.jar" value="${libs.dir}/google-collect-1.0.jar"/>
 	<property name="manifest.mf" value="META-INF/MANIFEST.MF"/>
-	
+
 	<property name="ant.build.javac.target" value="1.5"/>
-	
+
 	<loadproperties srcfile="${manifest.mf}" />
-	
+
 	<target name="clear">
 		<delete dir="${build.dir}" includeemptydirs="yes"/>
 		<mkdir dir="${build.dir}"/>
 	</target>
-	
+
 	<target name="build">
 		<mkdir dir="${classes.dir}"/>
 		<javac
 			srcdir="${source.dir}"
 			destdir="${classes.dir}"
-			classpath="${google-collect.jar}"
 		/>
 	</target>
 
@@ -36,7 +40,7 @@
 			<fileset dir="${classes.dir}"/>
 			<fileset dir="${source.dir}"/>
 		</copy>
-		
+
 		<jar
 			manifest="${manifest.mf}"
 			basedir="${work.dir}/jar"

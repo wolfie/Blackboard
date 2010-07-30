@@ -6,7 +6,7 @@ A Notifier can fire an Event that will be heard by a Listener (or many), whereve
 
 ## Caveats
 
-There is no singleton mechanism built into Blackboard – that has been left up to the implementor.  Instead of using a simple static final field, use a proper [ThreadLocal][tldoc] implementation. This is especially important for Java EE projects. You can find an example of its usage in this project's `example` source path.
+There is no singleton mechanism built into Blackboard - that has been left up to the implementor.  Instead of using a simple static final field, use a proper [ThreadLocal][tldoc] implementation. This is especially important for Java EE projects. You can find an example of its usage in this project's `example` source path.
 
 [tldoc]: http://java.sun.com/j2se/1.5.0/docs/api/java/lang/ThreadLocal.html
 
@@ -18,6 +18,14 @@ There is no singleton mechanism built into Blackboard – that has been left up 
 [googcol]: http://code.google.com/p/google-collections/
 
 ## Changelog
+
+**2.0.0**  
+- API is incompatible with eariler releases
+- Notifier is removed completely
+- Event is now an interface
+- Blackboard.register() now accepts only interface-Listeners
+- The example application is cleaned up
+- Dependency for Google Collections is removed
 
 **1.2.0**  
 Added logging.
