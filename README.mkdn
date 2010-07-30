@@ -25,7 +25,7 @@ There is no singleton mechanism built into Blackboard - that has been left up to
 **2.0.0**  
 - API is incompatible with eariler releases
 - Notifier is removed completely
-- Event is now an interface
+- com.github.wolfie.blackboard.Event is now an interface
 - Blackboard.register() now accepts only interface-Listeners
 - The example application is cleaned up
 - Dependency for Google Collections is removed
