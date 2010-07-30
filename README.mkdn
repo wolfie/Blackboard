@@ -19,6 +19,9 @@ There is no singleton mechanism built into Blackboard - that has been left up to
 
 ## Changelog
 
+**2.0.1**  
+- Registering abstract Events is disallowed
+
 **2.0.0**  
 - API is incompatible with eariler releases
 - Notifier is removed completely
