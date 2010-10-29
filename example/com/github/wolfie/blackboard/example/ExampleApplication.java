@@ -8,7 +8,6 @@ public class ExampleApplication {
   private static final Blackboard BLACKBOARD = new Blackboard();
 
   public static void main(final String[] args) {
-
     BLACKBOARD.enableLogging();
 
     /*

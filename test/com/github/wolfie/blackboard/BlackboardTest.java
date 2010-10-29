@@ -119,6 +119,13 @@ public class BlackboardTest {
     }
   }
 
+  private static class NonInterfaceListener implements Listener {
+    @SuppressWarnings("unused")
+    @ListenerMethod
+    public void listenerMethd(final TestEvent event) {
+    }
+  }
+
   private class MultiListenerOneEvent implements Event {
   }
 
@@ -150,6 +157,10 @@ public class BlackboardTest {
   @Test(expected = NullPointerException.class)
   public void testRegisteringNullEvent() {
     blackboard.register(TestListener.class, null);
+  }
+
+  public void testRegisteringListenerClass() {
+    blackboard.register(NonInterfaceListener.class, TestEvent.class);
   }
 
   @Test(expected = NoListenerMethodFoundException.class)

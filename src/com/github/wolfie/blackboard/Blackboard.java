@@ -3,6 +3,7 @@ package com.github.wolfie.blackboard;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,6 +12,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.wolfie.blackboard.annotation.ListenerMethod;
+import com.github.wolfie.blackboard.annotation.ListenerPair;
 import com.github.wolfie.blackboard.exception.DuplicateListenerMethodException;
 import com.github.wolfie.blackboard.exception.DuplicateRegistrationException;
 import com.github.wolfie.blackboard.exception.EventNotRegisteredException;
@@ -33,7 +35,7 @@ import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundExcepti
  * To avoid cross-application message leaking, the {@link Blackboard} is an
  * instance, not a static util class. This means, the client code must handle
  * making the instance available to the application globally, if that is
- * desired. The n&iuml;ve way would be to create it as a static instance in the
+ * desired. The na&iuml;ve way would be to create it as a static instance in the
  * application, but that is not thread safe (which, in some cases, might be
  * okay).
  * </p>
@@ -120,10 +122,13 @@ public class Blackboard {
   }
 
   private final Map<Class<? extends Event>, Registration> registrationsByEvent = new HashMap<Class<? extends Event>, Blackboard.Registration>();
-  private final Map<Class<? extends Listener>, Set<Listener>> listeners;
+  private final Map<Class<? extends Listener>, HashSet<Listener>> listeners;
+
+  /** Try to register listeners and events automatically as much as possible. */
+  private boolean magicRegistration = true;
 
   public Blackboard() {
-    listeners = new ConcurrentHashMap<Class<? extends Listener>, Set<Listener>>();
+    listeners = new ConcurrentHashMap<Class<? extends Listener>, HashSet<Listener>>();
   }
 
   /**
@@ -157,6 +162,12 @@ public class Blackboard {
    *           <tt>event</tt> is a interface or an abstract class object.
    */
   public void register(final Class<? extends Listener> listener,
+      final Class<? extends Event> event) {
+    magicRegistration = false;
+    _register(listener, event);
+  }
+
+  private void _register(final Class<? extends Listener> listener,
       final Class<? extends Event> event) {
 
     assertNotNull(listener, event);
@@ -201,14 +212,25 @@ public class Blackboard {
     Log.log("Adding " + listener + " for the following listeners:");
 
     final Class<? extends Listener> listenerClass = listener.getClass();
-    final Collection<Class<? extends Listener>> registeredListenerClasses = getRegisteredListenerClasses(listenerClass);
+    Collection<Class<? extends Listener>> registeredListenerClasses = getRegisteredListenerClasses(listenerClass);
 
     if (registeredListenerClasses.isEmpty()) {
-      throw new NoMatchingRegistrationFoundException(listenerClass);
+      boolean success = false;
+
+      if (magicRegistration) {
+        success = magicRegisterAllListenerInterfacesIn(listener);
+      }
+
+      if (!success) {
+        throw new NoMatchingRegistrationFoundException(listenerClass);
+      } else {
+        registeredListenerClasses = getRegisteredListenerClasses(listenerClass);
+      }
     }
 
     for (final Class<? extends Listener> registeredListenerClass : registeredListenerClasses) {
-      Set<Listener> listenersForClass = listeners.get(registeredListenerClass);
+      HashSet<Listener> listenersForClass = listeners
+          .get(registeredListenerClass);
       if (listenersForClass == null) {
         listenersForClass = new HashSet<Listener>();
         listeners.put(registeredListenerClass, listenersForClass);
@@ -219,6 +241,46 @@ public class Blackboard {
     }
 
     Log.logEmptyLine();
+  }
+
+  private boolean magicRegisterAllListenerInterfacesIn(final Listener listener) {
+    final Class<? extends Listener> listenerObjectClass = listener.getClass();
+
+    final Set<Class<? extends Listener>> interfaces = getListenerInterfacesRecursively(listenerObjectClass);
+    if (interfaces.isEmpty()) {
+      interfaces.add(listenerObjectClass);
+    }
+
+    for (final Class<? extends Listener> listenerClass : interfaces) {
+      findByListenerInlineClasses(listenerClass);
+    }
+
+    return !interfaces.isEmpty();
+  }
+
+  private Set<Class<? extends Listener>> getListenerInterfacesRecursively(
+      final Class<? extends Listener> listenerObjectClass) {
+    final Set<Class<? extends Listener>> interfaces = new HashSet<Class<? extends Listener>>();
+
+    final Set<Class<? extends Listener>> objectInterfaces = new HashSet<Class<? extends Listener>>();
+    @SuppressWarnings("unchecked")
+    final Collection<? extends Class<? extends Listener>> interfacesAsList = (Collection<? extends Class<? extends Listener>>) Arrays
+        .asList(listenerObjectClass.getInterfaces());
+    objectInterfaces.addAll(interfacesAsList);
+    objectInterfaces.remove(Listener.class);
+
+    for (final Class<? extends Object> iface : objectInterfaces) {
+      if (Listener.class.isAssignableFrom(iface)) {
+        @SuppressWarnings("unchecked")
+        final Class<? extends Listener> listenerIface = (Class<? extends Listener>) iface;
+        interfaces.addAll(getListenerInterfacesRecursively(listenerIface));
+        if (interfaces.isEmpty()) {
+          interfaces.add(listenerIface);
+        }
+      }
+    }
+
+    return interfaces;
   }
 
   private Collection<Class<? extends Listener>> getRegisteredListenerClasses(
@@ -308,12 +370,18 @@ public class Blackboard {
     final Class<? extends Listener> listenerClass = registration.getListener();
     final Method listenerMethod = registration.getMethod();
 
-    final Set<Listener> listenersForClass = listeners.get(listenerClass);
+    final HashSet<Listener> listenersForClass = listeners.get(listenerClass);
     if (listenersForClass == null) {
       return;
     }
 
-    for (final Listener listener : listenersForClass) {
+    // The Set is cloned to make concurrency better, and avoid concurrent
+    // modification exceptions.
+    @SuppressWarnings("unchecked")
+    final Set<Listener> clonedListenersForClass = (Set<Listener>) listenersForClass
+        .clone();
+
+    for (final Listener listener : clonedListenersForClass) {
       try {
         Log.log("  triggering " + listener);
 
@@ -353,5 +421,100 @@ public class Blackboard {
 
   public void disableLogging() {
     Log.setLogging(false);
+  }
+
+  public void discover() {
+    final Exception exception = new Exception();
+    exception.fillInStackTrace();
+    final StackTraceElement[] stackTrace = exception.getStackTrace();
+
+    if (stackTrace.length < 2) {
+      throw new RuntimeException("Can't autodiscover, seems like "
+          + "this method was never called from anywhere");
+    }
+
+    final StackTraceElement caller = stackTrace[1];
+    try {
+      discoverFrom(getClass().getClassLoader().loadClass(caller.getClassName()));
+    } catch (final ClassNotFoundException e) {
+      throw new RuntimeException("Caller class \"" + caller.getClassName()
+          + "\" could not be loaded with the current "
+          + "ClassLoader. Use discoverFrom() for better luck.");
+    }
+  }
+
+  public void discoverFrom(final Class<?> referenceClass) {
+    final Class<? extends Object>[] classes = ClassDiscovery.DiscoverClasses(
+        referenceClass, null, null);
+
+    for (final Class<? extends Object> clazz : classes) {
+      try {
+        if (findByAnnotation(clazz)) {
+          continue;
+          // } else if (findByListenerInlineClasses(clazz)) {
+          // continue;
+        } else if (findByEventInlineClasses(clazz)) {
+          continue;
+        }
+      } catch (final DuplicateRegistrationException e) {
+        // Ignore, we're doing magic!
+      }
+    }
+  }
+
+  private boolean findByAnnotation(final Class<? extends Object> eventCandidate) {
+
+    if (Event.class.isAssignableFrom(eventCandidate)) {
+      final ListenerPair listenerPair = eventCandidate
+          .getAnnotation(ListenerPair.class);
+      if (listenerPair != null) {
+        @SuppressWarnings("unchecked")
+        final Class<? extends Event> eventClass = (Class<? extends Event>) eventCandidate;
+        _register(listenerPair.value(), eventClass);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private boolean findByListenerInlineClasses(
+      final Class<? extends Object> listenerCandidate) {
+    if (Listener.class.isAssignableFrom(listenerCandidate)) {
+      final Class<?> declaringClass = listenerCandidate.getDeclaringClass();
+      if (declaringClass != null
+          && Event.class.isAssignableFrom(declaringClass)) {
+        @SuppressWarnings("unchecked")
+        final Class<? extends Event> eventClass = (Class<? extends Event>) declaringClass;
+        @SuppressWarnings("unchecked")
+        final Class<? extends Listener> listenerClass = (Class<? extends Listener>) listenerCandidate;
+
+        _register(listenerClass, eventClass);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private boolean findByEventInlineClasses(
+      final Class<? extends Object> eventCandidate) {
+    if (Event.class.isAssignableFrom(eventCandidate)) {
+
+      for (final Class<? extends Object> innerClass : eventCandidate
+          .getDeclaredClasses()) {
+        if (innerClass != null && Listener.class.isAssignableFrom(innerClass)) {
+          @SuppressWarnings("unchecked")
+          final Class<? extends Event> eventClass = (Class<? extends Event>) eventCandidate;
+          @SuppressWarnings("unchecked")
+          final Class<? extends Listener> listenerClass = (Class<? extends Listener>) innerClass;
+
+          _register(listenerClass, eventClass);
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }

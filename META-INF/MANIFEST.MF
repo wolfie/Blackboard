@@ -3,5 +3,5 @@ Vaadin-License-Title: Apache License 2.0
 Implementation-Title: Blackboard
 Vaadin-License-File: http://www.apache.org/licenses/LICENSE-2.0.html
 Vaadin-Package-Version: 1
-Implementation-Version: 2.0.1
+Implementation-Version: 2.1.0
 Implementation-Vendor: Henrik Paul
