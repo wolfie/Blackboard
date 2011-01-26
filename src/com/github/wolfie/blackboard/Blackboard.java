@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -74,6 +75,64 @@ public class Blackboard {
             "Unexpected interface or abstract class argument: " + event);
       }
 
+      final Method listenerMethod = getListenerMethod(listener, event);
+
+      final Class<?>[] parameterTypes = listenerMethod.getParameterTypes();
+      if (parameterTypes.length != 1 || !parameterTypes[0].equals(event)) {
+        throw new IncompatibleListenerMethodException(listener, listenerMethod,
+            event);
+      }
+
+      Log.log(String.format("Registering %s.%s() to %s", listener.getName(),
+          listenerMethod.getName(), event.getName()));
+      Log.logEmptyLine();
+
+      method = listenerMethod;
+      this.listener = listener;
+      this.event = event;
+    }
+
+    /**
+     * Try to find the method to call when a {@link Listener} should be called.
+     * 
+     * @param listener
+     *          the Listener class to be scanned for a method.
+     * @param event2
+     * @return The found listener method.
+     * @throws NoListenerMethodFoundException
+     *           if no suitable listener method was found.
+     */
+    private Method getListenerMethod(final Class<? extends Listener> listener,
+        final Class<? extends Event> event) {
+      Method listenerMethod = getListenerMethodByAnnotation(listener);
+      if (listenerMethod == null) {
+        listenerMethod = getListenerMethodByBeingOnlyMethod(listener);
+      }
+      if (listenerMethod == null) {
+        listenerMethod = getListenerMethodByBeingOnlySuitableMethod(listener,
+            event);
+      }
+      if (listenerMethod == null) {
+        throw new NoListenerMethodFoundException(listener, event);
+      }
+      return listenerMethod;
+    }
+
+    /**
+     * Try to find the listener method from a {@link Listener} class by
+     * annotation.
+     * 
+     * @param listener
+     *          the {@link Listener} class to scan through.
+     * @return the evaluated listener method, or <code>null</code> if no
+     *         suitable method was found.
+     * @throws DuplicateListenerMethodException
+     *           if <code>listener</code> has more than two methods annotated.
+     * @see ListenerMethod
+     */
+    private Method getListenerMethodByAnnotation(
+        final Class<? extends Listener> listener) {
+
       Method listenerMethod = null;
       for (final Method candidateMethod : listener.getMethods()) {
         final ListenerMethod annotation = candidateMethod
@@ -90,22 +149,66 @@ public class Blackboard {
       }
 
       if (listenerMethod != null) {
-        final Class<?>[] parameterTypes = listenerMethod.getParameterTypes();
-        if (parameterTypes.length != 1 || !parameterTypes[0].equals(event)) {
-          throw new IncompatibleListenerMethodException(listener,
-              listenerMethod, event);
-        }
-      } else {
-        throw new NoListenerMethodFoundException(listener);
+        Log.log("Found listener method by annotation");
       }
 
-      Log.log(String.format("Registering %s.%s() to %s", listener.getName(),
-          listenerMethod.getName(), event.getName()));
-      Log.logEmptyLine();
+      return listenerMethod;
+    }
 
-      method = listenerMethod;
-      this.listener = listener;
-      this.event = event;
+    /**
+     * This method returns blindly the only method a class has (does not do any
+     * suitability checks - they should be done afterwards).
+     * 
+     * @param listener
+     *          The {@link Listener} to search amongst
+     * @return the only method in the class. <code>null</code> if there are no
+     *         methods, or more than one method.
+     */
+    private Method getListenerMethodByBeingOnlyMethod(
+        final Class<? extends Listener> listener) {
+      final Method[] declaredMethods = listener.getDeclaredMethods();
+      if (declaredMethods.length == 1) {
+        Log.log("Found listener method by being the only method in the class");
+        return declaredMethods[0];
+      } else {
+        return null;
+      }
+    }
+
+    /**
+     * If there is a method that takes a parameter of exactly the same type as
+     * the sent event, and only one of said methods, get it.
+     * 
+     * @param listener
+     *          The {@link Listener} to scan
+     * @param event
+     *          The {@link Event} class to match the parameter to.
+     * @return The single method should be a listener method.
+     */
+    private Method getListenerMethodByBeingOnlySuitableMethod(
+        final Class<? extends Listener> listener,
+        final Class<? extends Event> event) {
+
+      Method listenerCandidate = null;
+
+      for (final Method method : listener.getDeclaredMethods()) {
+        final Class<?>[] parameterTypes = method.getParameterTypes();
+        if (parameterTypes.length == 1 && parameterTypes[0].equals(event)) {
+
+          if (listenerCandidate != null) {
+            // too many potential matches, so suggest nothing.
+            return null;
+          }
+
+          listenerCandidate = method;
+        }
+      }
+
+      if (listenerCandidate != null) {
+        Log.log("Found listener method by being the only suitable method in the class");
+      }
+
+      return listenerCandidate;
     }
 
     public Class<? extends Listener> getListener() {
@@ -251,21 +354,25 @@ public class Blackboard {
       interfaces.add(listenerObjectClass);
     }
 
+    boolean success = false;
     for (final Class<? extends Listener> listenerClass : interfaces) {
-      findByListenerInlineClasses(listenerClass);
+      final boolean resultIsSuccessful = findByListenerInlineClasses(listenerClass);
+      if (resultIsSuccessful) {
+        success = true;
+      }
     }
 
-    return !interfaces.isEmpty();
+    return success;
   }
 
   private Set<Class<? extends Listener>> getListenerInterfacesRecursively(
       final Class<? extends Listener> listenerObjectClass) {
     final Set<Class<? extends Listener>> interfaces = new HashSet<Class<? extends Listener>>();
 
-    final Set<Class<? extends Listener>> objectInterfaces = new HashSet<Class<? extends Listener>>();
-    @SuppressWarnings("unchecked")
-    final Collection<? extends Class<? extends Listener>> interfacesAsList = (Collection<? extends Class<? extends Listener>>) Arrays
-        .asList(listenerObjectClass.getInterfaces());
+    final HashSet<Class<? extends Object>> objectInterfaces = new HashSet<Class<? extends Object>>();
+
+    final List<Class<?>> interfacesAsList = Arrays.asList(listenerObjectClass
+        .getInterfaces());
     objectInterfaces.addAll(interfacesAsList);
     objectInterfaces.remove(Listener.class);
 
@@ -444,6 +551,8 @@ public class Blackboard {
   }
 
   public void discoverFrom(final Class<?> referenceClass) {
+    Log.log("Starting automatic discovery from " + referenceClass.getName());
+
     final Class<? extends Object>[] classes = ClassDiscovery.DiscoverClasses(
         referenceClass, null, null);
 
@@ -516,5 +625,11 @@ public class Blackboard {
     }
 
     return false;
+  }
+
+  public void clear() {
+    Log.log("Clearing Blackboard");
+    listeners.clear();
+    registrationsByEvent.clear();
   }
 }

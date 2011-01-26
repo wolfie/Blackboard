@@ -2,7 +2,6 @@ package com.github.wolfie.blackboard.example;
 
 import com.github.wolfie.blackboard.Event;
 import com.github.wolfie.blackboard.Listener;
-import com.github.wolfie.blackboard.annotation.ListenerMethod;
 
 /**
  * The event that is passed from {@link ExampleNotifier} to
@@ -20,7 +19,6 @@ public class TestMessageEvent implements Event {
    * name describes naturally what the listener is trying to do.
    */
   public interface TestMessageListener extends Listener {
-    @ListenerMethod
     public void receiveTestMessage(final TestMessageEvent event);
   }
 
