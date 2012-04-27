@@ -137,7 +137,7 @@ public class BlackboardTest {
     public void eventOne(EventOne event);
 
     @ListenerMethod
-    public void eventOne(EventTwo event);
+    public void eventTwo(EventTwo event);
   }
 
   public static class MultiEventPerListenerImpl implements
@@ -149,7 +149,7 @@ public class BlackboardTest {
       one = true;
     }
 
-    public void eventOne(final EventTwo event) {
+    public void eventTwo(final EventTwo event) {
       two = true;
     }
 
@@ -350,10 +350,6 @@ public class BlackboardTest {
     blackboard.register(MultiEventPerListener.class, EventOne.class);
     blackboard.register(MultiEventPerListener.class, EventTwo.class);
 
-    _testMultiEventPerListener();
-  }
-
-  private void _testMultiEventPerListener() {
     final MultiEventPerListenerImpl obj = new MultiEventPerListenerImpl();
     blackboard.addListener(obj);
 
@@ -362,5 +358,6 @@ public class BlackboardTest {
 
     blackboard.fire(new EventTwo());
     assertTrue("Event two wasn't called", obj.eventTwoCalled());
+
   }
 }

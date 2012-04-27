@@ -393,7 +393,7 @@ public class Blackboard {
 
     boolean success = false;
     for (final Class<? extends Listener> listenerClass : interfaces) {
-      final boolean resultIsSuccessful = findByListenerInlineClasses(listenerClass);
+      final boolean resultIsSuccessful = findAndRegisterByListenerInlineClasses(listenerClass);
       if (resultIsSuccessful) {
         success = true;
       }
@@ -624,7 +624,7 @@ public class Blackboard {
     return false;
   }
 
-  private boolean findByListenerInlineClasses(
+  private boolean findAndRegisterByListenerInlineClasses(
       final Class<? extends Object> listenerCandidate) {
     if (Listener.class.isAssignableFrom(listenerCandidate)) {
       final Class<?> declaringClass = listenerCandidate.getDeclaringClass();
