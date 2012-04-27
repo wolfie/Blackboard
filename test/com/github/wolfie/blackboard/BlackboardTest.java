@@ -10,7 +10,6 @@ import com.github.wolfie.blackboard.annotation.ListenerMethod;
 import com.github.wolfie.blackboard.exception.DuplicateListenerMethodException;
 import com.github.wolfie.blackboard.exception.DuplicateRegistrationException;
 import com.github.wolfie.blackboard.exception.InvalidListenerMethodConstruction;
-import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundException;
 import com.github.wolfie.blackboard.exception.NoSuitableListenerMethodFoundException;
 
 public class BlackboardTest {
@@ -236,11 +235,6 @@ public class BlackboardTest {
     blackboard.register(IncompatibleMethodCountListener.class, TestEvent.class);
   }
 
-  @Test(expected = NoMatchingRegistrationFoundException.class)
-  public void testAddListenerWithoutRegistration() {
-    blackboard.addListener(new TestListenerImpl());
-  }
-
   @Test
   public void testTwoListenersInOneClass() {
     blackboard.register(MultiListenerOneListener.class,
@@ -350,6 +344,15 @@ public class BlackboardTest {
     blackboard.register(MultiEventPerListener.class, EventOne.class);
     blackboard.register(MultiEventPerListener.class, EventTwo.class);
 
+    _callMultiEventPerListener();
+  }
+
+  @Test
+  public void testMultiEventPerListenerWithoutRegistration() {
+    _callMultiEventPerListener();
+  }
+
+  private void _callMultiEventPerListener() {
     final MultiEventPerListenerImpl obj = new MultiEventPerListenerImpl();
     blackboard.addListener(obj);
 
@@ -358,6 +361,5 @@ public class BlackboardTest {
 
     blackboard.fire(new EventTwo());
     assertTrue("Event two wasn't called", obj.eventTwoCalled());
-
   }
 }

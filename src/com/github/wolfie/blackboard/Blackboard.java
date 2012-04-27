@@ -399,7 +399,52 @@ public class Blackboard {
       }
     }
 
+    for (final Class<? extends Listener> listenerClass : interfaces) {
+      final boolean resultIsSuccessful = findAndRegisterByAnnotationAndParameterType(listenerClass);
+      if (resultIsSuccessful) {
+        success = true;
+      }
+    }
+
     return success;
+  }
+
+  private boolean findAndRegisterByAnnotationAndParameterType(
+      final Class<? extends Listener> listenerClass) {
+
+    boolean success = false;
+    for (final Method method : listenerClass.getMethods()) {
+      final ListenerMethod annotation = method
+          .getAnnotation(ListenerMethod.class);
+      if (annotation != null) {
+        _register(listenerClass, getEventType(method, listenerClass));
+        success = true;
+      }
+    }
+
+    return success;
+  }
+
+  /**
+   * 
+   * @param method
+   * @param listener
+   * @throws InvalidListenerMethodConstruction
+   * @return
+   */
+  private static Class<? extends Event> getEventType(final Method method,
+      final Class<? extends Listener> listener) {
+    final Class<?>[] parameterTypes = method.getParameterTypes();
+    if (parameterTypes.length == 1) {
+      final Class<?> type = parameterTypes[0];
+      if (Event.class.isAssignableFrom(type)) {
+        @SuppressWarnings("unchecked")
+        final Class<? extends Event> eventType = (Class<? extends Event>) type;
+        return eventType;
+      }
+    }
+
+    throw new InvalidListenerMethodConstruction(listener, listener, method);
   }
 
   private Set<Class<? extends Listener>> getListenerInterfacesRecursively(

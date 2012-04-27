@@ -16,7 +16,7 @@ public class InvalidListenerMethodConstruction extends RuntimeException {
       final Class<? extends Listener> originalListener, final Method method) {
 
     final String addition;
-    if (listener != originalListener) {
+    if (originalListener != null && listener != originalListener) {
       addition = " (a superclass/superinterface to %s) ";
     } else {
       addition = " ";
