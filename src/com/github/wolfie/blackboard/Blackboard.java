@@ -18,8 +18,9 @@ import com.github.wolfie.blackboard.exception.DuplicateListenerMethodException;
 import com.github.wolfie.blackboard.exception.DuplicateRegistrationException;
 import com.github.wolfie.blackboard.exception.EventNotRegisteredException;
 import com.github.wolfie.blackboard.exception.IncompatibleListenerMethodException;
-import com.github.wolfie.blackboard.exception.NoListenerMethodFoundException;
+import com.github.wolfie.blackboard.exception.InvalidListenerMethodConstruction;
 import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundException;
+import com.github.wolfie.blackboard.exception.NoSuitableListenerMethodFoundException;
 
 /**
  * <p>
@@ -99,21 +100,18 @@ public class Blackboard {
      *          the Listener class to be scanned for a method.
      * @param event2
      * @return The found listener method.
-     * @throws NoListenerMethodFoundException
+     * @throws NoSuitableListenerMethodFoundException
      *           if no suitable listener method was found.
      */
     private Method getListenerMethod(final Class<? extends Listener> listener,
         final Class<? extends Event> event) {
-      Method listenerMethod = getListenerMethodByAnnotation(listener);
-      if (listenerMethod == null) {
-        listenerMethod = getListenerMethodByBeingOnlyMethod(listener);
-      }
+      Method listenerMethod = getListenerMethodByAnnotation(listener, event);
       if (listenerMethod == null) {
         listenerMethod = getListenerMethodByBeingOnlySuitableMethod(listener,
             event);
       }
       if (listenerMethod == null) {
-        throw new NoListenerMethodFoundException(listener, event);
+        throw new NoSuitableListenerMethodFoundException(listener, event);
       }
       return listenerMethod;
     }
@@ -124,21 +122,22 @@ public class Blackboard {
      * 
      * @param listener
      *          the {@link Listener} class to scan through.
+     * @param event
      * @return the evaluated listener method, or <code>null</code> if no
      *         suitable method was found.
-     * @throws DuplicateListenerMethodException
-     *           if <code>listener</code> has more than two methods annotated.
      * @see ListenerMethod
      */
-    private Method getListenerMethodByAnnotation(
-        final Class<? extends Listener> listener) {
+    private static Method getListenerMethodByAnnotation(
+        final Class<? extends Listener> listener,
+        final Class<? extends Event> event) {
 
       Method listenerMethod = null;
+
       for (final Method candidateMethod : listener.getMethods()) {
         final ListenerMethod annotation = candidateMethod
             .getAnnotation(ListenerMethod.class);
 
-        if (annotation != null) {
+        if (annotation != null && hasSuitableParameter(candidateMethod, event)) {
           if (listenerMethod == null) {
             listenerMethod = candidateMethod;
           } else {
@@ -155,24 +154,10 @@ public class Blackboard {
       return listenerMethod;
     }
 
-    /**
-     * This method returns blindly the only method a class has (does not do any
-     * suitability checks - they should be done afterwards).
-     * 
-     * @param listener
-     *          The {@link Listener} to search amongst
-     * @return the only method in the class. <code>null</code> if there are no
-     *         methods, or more than one method.
-     */
-    private Method getListenerMethodByBeingOnlyMethod(
-        final Class<? extends Listener> listener) {
-      final Method[] declaredMethods = listener.getDeclaredMethods();
-      if (declaredMethods.length == 1) {
-        Log.log("Found listener method by being the only method in the class");
-        return declaredMethods[0];
-      } else {
-        return null;
-      }
+    private static boolean hasSuitableParameter(final Method candidateMethod,
+        final Class<? extends Event> event) {
+      final Class<?>[] params = candidateMethod.getParameterTypes();
+      return params.length == 1 && event.isAssignableFrom(params[0]);
     }
 
     /**
@@ -185,7 +170,7 @@ public class Blackboard {
      *          The {@link Event} class to match the parameter to.
      * @return The single method should be a listener method.
      */
-    private Method getListenerMethodByBeingOnlySuitableMethod(
+    private static Method getListenerMethodByBeingOnlySuitableMethod(
         final Class<? extends Listener> listener,
         final Class<? extends Event> event) {
 
@@ -230,6 +215,8 @@ public class Blackboard {
   /** Try to register listeners and events automatically as much as possible. */
   private boolean magicRegistration = true;
 
+  private final Set<Class<? extends Listener>> checkedListeners = new HashSet<Class<? extends Listener>>();
+
   public Blackboard() {
     listeners = new ConcurrentHashMap<Class<? extends Listener>, HashSet<Listener>>();
   }
@@ -254,7 +241,7 @@ public class Blackboard {
    * @throws DuplicateListenerMethodException
    *           if <tt>listener</tt> has more than one public method annotated
    *           with {@link ListenerMethod}.
-   * @throws NoListenerMethodFoundException
+   * @throws NoSuitableListenerMethodFoundException
    *           if <tt>listener</tt> has no public methods annotated with
    *           {@link ListenerMethod}.
    * @throws IncompatibleListenerMethodException
@@ -275,17 +262,67 @@ public class Blackboard {
 
     assertNotNull(listener, event);
 
-    for (final Registration registration : registrationsByEvent.values()) {
-      final Class<? extends Listener> existingListener = registration
-          .getListener();
-      final Class<? extends Event> existingEvent = registration.getEvent();
+    checkForInvalidConstruction(listener, listener);
+    checkForDuplicateRegistrations(listener, event);
 
-      if (existingListener.equals(listener) || existingEvent.equals(event)) {
-        throw new DuplicateRegistrationException(listener, event,
-            existingListener, existingEvent);
+    registrationsByEvent.put(event, new Registration(listener, event));
+  }
+
+  private void checkForInvalidConstruction(
+      final Class<? extends Listener> listener,
+      final Class<? extends Listener> originalListener) {
+    for (final Class<? extends Listener> checkedListener : checkedListeners) {
+      if (checkedListener.equals(listener)) {
+        return;
       }
     }
-    registrationsByEvent.put(event, new Registration(listener, event));
+
+    for (final Method method : listener.getMethods()) {
+      final ListenerMethod annotation = method
+          .getAnnotation(ListenerMethod.class);
+      if (annotation != null) {
+        final Class<?>[] params = method.getParameterTypes();
+        if (params.length != 1 || !Event.class.isAssignableFrom(params[0])) {
+          throw new InvalidListenerMethodConstruction(listener,
+              originalListener, method);
+        }
+      }
+    }
+
+    // check for subinterfaces
+    final Class<?> c = listener.getSuperclass();
+    if (c != null && Listener.class.isAssignableFrom(c)) {
+      @SuppressWarnings("unchecked")
+      final Class<? extends Listener> superListener = (Class<? extends Listener>) c;
+      checkForInvalidConstruction(superListener, originalListener);
+    }
+
+    for (final Class<?> iface : listener.getInterfaces()) {
+      if (Listener.class.isAssignableFrom(iface)) {
+        @SuppressWarnings("unchecked")
+        final Class<? extends Listener> cIface = (Class<? extends Listener>) iface;
+        checkForInvalidConstruction(cIface, originalListener);
+      }
+    }
+
+    checkedListeners.add(listener);
+  }
+
+  /**
+   * @throws DuplicateRegistrationException
+   *           if the registration already exists.
+   */
+  private void checkForDuplicateRegistrations(
+      final Class<? extends Listener> listener,
+      final Class<? extends Event> event) {
+    for (final Registration registration : registrationsByEvent.values()) {
+      final Class<? extends Event> existingEvent = registration.getEvent();
+
+      if (existingEvent.equals(event)) {
+        throw new DuplicateRegistrationException(listener, event,
+            registration.getListener(), existingEvent);
+      }
+    }
   }
 
   /**
