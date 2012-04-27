@@ -19,6 +19,9 @@ There is no singleton mechanism built into Blackboard - that has been left up to
 
 ## Changelog
 
+**2.2.0**
+- It's now allowed to register several events to one listener
+
 **2.0.1**  
 - Registering abstract Events is disallowed
 
