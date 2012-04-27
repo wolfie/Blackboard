@@ -9,9 +9,9 @@ import org.junit.Test;
 import com.github.wolfie.blackboard.annotation.ListenerMethod;
 import com.github.wolfie.blackboard.exception.DuplicateListenerMethodException;
 import com.github.wolfie.blackboard.exception.DuplicateRegistrationException;
-import com.github.wolfie.blackboard.exception.IncompatibleListenerMethodException;
-import com.github.wolfie.blackboard.exception.NoListenerMethodFoundException;
+import com.github.wolfie.blackboard.exception.InvalidListenerMethodConstruction;
 import com.github.wolfie.blackboard.exception.NoMatchingRegistrationFoundException;
+import com.github.wolfie.blackboard.exception.NoSuitableListenerMethodFoundException;
 
 public class BlackboardTest {
 
@@ -132,6 +132,42 @@ public class BlackboardTest {
   private class MultiListenerTwoEvent implements Event {
   }
 
+  public interface MultiEventPerListener extends Listener {
+    @ListenerMethod
+    public void eventOne(EventOne event);
+
+    @ListenerMethod
+    public void eventOne(EventTwo event);
+  }
+
+  public static class MultiEventPerListenerImpl implements
+      MultiEventPerListener {
+    private boolean one = false;
+    private boolean two = false;
+
+    public void eventOne(final EventOne event) {
+      one = true;
+    }
+
+    public void eventOne(final EventTwo event) {
+      two = true;
+    }
+
+    public boolean eventOneCalled() {
+      return one;
+    }
+
+    public boolean eventTwoCalled() {
+      return two;
+    }
+  }
+
+  public static class EventOne implements Event {
+  }
+
+  public static class EventTwo implements Event {
+  }
+
   private Blackboard blackboard;
 
   @Before
@@ -163,7 +199,7 @@ public class BlackboardTest {
     blackboard.register(NonInterfaceListener.class, TestEvent.class);
   }
 
-  @Test(expected = NoListenerMethodFoundException.class)
+  @Test(expected = NoSuitableListenerMethodFoundException.class)
   public void testRegistrationWithNoMethodListener() {
     blackboard.register(NoMethodListener.class, TestEvent.class);
   }
@@ -180,28 +216,22 @@ public class BlackboardTest {
   }
 
   @Test(expected = DuplicateRegistrationException.class)
-  public void testDuplicateRegistrationOfListener() {
-    blackboard.register(TestListener.class, TestEvent.class);
-    blackboard.register(TestListener.class, SecondTestEvent.class);
-  }
-
-  @Test(expected = DuplicateRegistrationException.class)
   public void testDuplicateRegistrationOfEvent() {
     blackboard.register(TestListener.class, TestEvent.class);
     blackboard.register(SecondTestListener.class, TestEvent.class);
   }
 
-  @Test(expected = IncompatibleListenerMethodException.class)
+  @Test(expected = InvalidListenerMethodConstruction.class)
   public void testInvalidListenerArgumentRegistration() {
     blackboard.register(InvalidMethodArgumentListener.class, TestEvent.class);
   }
 
-  @Test(expected = IncompatibleListenerMethodException.class)
+  @Test(expected = NoSuitableListenerMethodFoundException.class)
   public void testIncompatibleEventRegistration() {
     blackboard.register(IncompatibleEventListener.class, TestEvent.class);
   }
 
-  @Test(expected = IncompatibleListenerMethodException.class)
+  @Test(expected = InvalidListenerMethodConstruction.class)
   public void testIncompatibleMethodCountRegistration() {
     blackboard.register(IncompatibleMethodCountListener.class, TestEvent.class);
   }
@@ -313,5 +343,24 @@ public class BlackboardTest {
   public void testRegisteringAbstractEvent() {
     blackboard
         .register(ListenerForAbstractEvent.class, AbstractTestEvent.class);
+  }
+
+  @Test
+  public void testMultiEventPerListenerWithRegistration() {
+    blackboard.register(MultiEventPerListener.class, EventOne.class);
+    blackboard.register(MultiEventPerListener.class, EventTwo.class);
+
+    _testMultiEventPerListener();
+  }
+
+  private void _testMultiEventPerListener() {
+    final MultiEventPerListenerImpl obj = new MultiEventPerListenerImpl();
+    blackboard.addListener(obj);
+
+    blackboard.fire(new EventOne());
+    assertTrue("Event one wasn't called", obj.eventOneCalled());
+
+    blackboard.fire(new EventTwo());
+    assertTrue("Event two wasn't called", obj.eventTwoCalled());
   }
 }
